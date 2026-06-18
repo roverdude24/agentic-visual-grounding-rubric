@@ -71,10 +71,26 @@ Send the VLM the smallest useful artifact and a strict schema:
 ```json
 {
   "question": "Is the logo fully visible in this crop?",
-  "artifact_uri": "local://abc123-logo-crop.jpg",
+  "artifact_path": ".omp_vlm_temp/abc123-logo-crop.jpg",
   "artifact_dimensions": [420, 180],
   "schema": "VisualGroundingResult"
 }
+```
+
+---
+
+## URI mapping & local file resolution
+
+When using agents in environments (like OMP) where image loading is sensitive to file locations:
+- **The Out-of-Workspace image hang:** The agent's `read()` tool may only auto-detect image formats for files located inside the active workspace. If you reference out-of-workspace URIs (like `local://` paths pointing to the session root folder), the tool might read the raw binary file as UTF-8 text, flooding the context with binary garbage and causing the model to hang or error.
+- **The Workspace resolution fix:** Always copy the visual artifacts from `local://` to a temporary directory in your active workspace (e.g., `.omp_vlm_temp/`) and rewrite the prompt's URIs to relative workspace paths before executing the VLM call.
+- **The Helper:** Use `cgv.routing.prepare_prompt_for_vlm(prompt_str)` to automatically parse, copy, and replace all `local://` URIs in a prompt with safe workspace paths before calling the VLM subtask.
+
+```python
+from cgv.routing import prepare_prompt_for_vlm
+
+prompt_safe = prepare_prompt_for_vlm(prompt_with_local_uris)
+response = agent(prompt_safe, model="your-vision-model")
 ```
 
 Ask for concrete cues. Reject answers that do not cite pixels in the crop or overlay.
