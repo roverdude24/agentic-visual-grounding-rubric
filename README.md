@@ -2,11 +2,11 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](pyproject.toml)
-[![Agents Compatibility](https://img.shields.io/badge/compatibility-Cursor%20%7C%20Claude%20Code%20%7C%20Windsurf%20%7C%20Copilot-orange.svg)](#1-minute-setup)
+[![Agents & Harnesses Compatibility](https://img.shields.io/badge/compatibility-OMP%20%7C%20LangChain%20%7C%20Cursor%20%7C%20Claude%20Code-orange.svg)](#1-minute-setup)
 
-CGV is an agent rubric for visual work. It makes the agent inspect pixels with code before it asks a vision model for judgment.
+CGV is a visual reasoning rubric and CPU toolset for any AI agent, framework, or harness. It makes the agent inspect pixels with code before it asks a vision model for judgment.
 
-Use CGV when an agent must reason about images, video frames, screenshots, overlays, layout, continuity, or generated media.
+Use CGV when an agent or harness must reason about images, video frames, screenshots, overlays, layout, continuity, or generated media.
 
 ---
 
@@ -69,7 +69,7 @@ Skip CGV for:
 
 ## The CGV contract for agents
 
-Use these rules in Cursor, Claude Code, Windsurf, Copilot, or any agent runner.
+Use these rules in Cursor, Claude Code, Windsurf, Copilot, OMP, LangChain, AutoGPT, CrewAI, AutoGen, or any agent runner/framework.
 
 1. **Inspect with code first.** Use local CPU tools before a VLM: FFmpeg, Pillow, OpenCV-style geometry, OCR, hashes, and diffs.
 2. **Send focused artifacts.** Crop or overlay the relevant region. Do not inject raw full-resolution images into the main context.
@@ -153,15 +153,15 @@ The Python model lives in `cgv/schemas.py` as `VisualGroundingResult`.
 
 ---
 
-## Agent rule templates
+## Agent and harness rule templates
 
-- [`agent-rules/cursor-rules.md`](agent-rules/cursor-rules.md)
-- [`agent-rules/claude-code.md`](agent-rules/claude-code.md)
-- [`agent-rules/windsurf-rules.md`](agent-rules/windsurf-rules.md)
-- [`agent-rules/copilot-instructions.md`](agent-rules/copilot-instructions.md)
+- [`agent-rules/cursor-rules.md`](agent-rules/cursor-rules.md) (IDE agents)
+- [`agent-rules/claude-code.md`](agent-rules/claude-code.md) (CLI agents)
+- [`agent-rules/windsurf-rules.md`](agent-rules/windsurf-rules.md) (IDE agents)
+- [`agent-rules/copilot-instructions.md`](agent-rules/copilot-instructions.md) (Copilot)
+- [`skill/visual_grounding_rubric.md`](skill/visual_grounding_rubric.md) (Declarative skill for OMP/Harnesses)
 
-Each file contains the same CGV contract, adapted to the target agent's project-rule format.
-
+Each file contains the same CGV contract, adapted to the target agent or harness integration format.
 ---
 
 ## Documentation
