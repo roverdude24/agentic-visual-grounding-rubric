@@ -1,69 +1,79 @@
-# Visual Grounding Rubric for Agents
+# Visual Grounding Rubric
 
-Use this skill for visual or spatial assets: video frames, screenshots, layouts, and overlays. Inspect with code before asking a VLM for judgment.
+Use this skill for visual or spatial tasks: video frames, screenshots, layouts, overlays, generated images, and generated video. Inspect with code before asking a VLM for judgment.
 
 ---
 
-## 1. Trigger conditions
+## Trigger conditions
 
 Load this rubric for:
-- Video QC, keyframes, scene boundaries, continuity audits.
-- UI layout inspection, screenshot debugging, alignment.
-- Contrast checks and logo or watermark placement.
-- Generated image or video QC against prompt constraints.
 
-Skip it for text-only code, research, docs, or package config.
+- Video QC, keyframes, scene boundaries, and continuity audits.
+- UI layout inspection, screenshot debugging, clipped text, overlap, and alignment.
+- Contrast checks, logo placement, watermark placement, and visual constraints.
+- Generated image or video QC against a prompt or storyboard.
+
+Skip it for text-only code, research, documentation, or package config.
 
 ---
 
-## 2. Deterministic-first protocol
+## Protocol
 
-Split the work:
-1. Deterministic layer: local CPU code in Jupyter, IPython, or shell. Compute, crop, diff, or measure first.
-2. Semantic layer: remote image-capable VLM. Use it only for judgment code cannot supply.
+1. **Start with deterministic evidence.** Use CPU code to extract frames, crop regions, compute diffs, draw overlays, check dimensions, hash files, or measure boxes.
+2. **Register artifacts.** Store generated images or clips as paths or `local://` URIs with labels, purpose, dimensions, and hashes.
+3. **Ask a VLM only for semantics.** Send the exact crop or overlay. Do not send full raw media when a focused artifact answers the question.
+4. **Validate the VLM response.** Require structured output and reject malformed answers.
+5. **Verify geometry with code.** Treat VLM coordinates as proposals. Check bounds, overlap, IoU, and intersections locally.
+6. **Fail closed.** If no image-capable model is configured, stop with a configuration error. Never use a text-only model as a visual fallback.
 
-```mermaid
-graph TD
-    Task[Visual Task] --> Match{Pure Semantic?}
-    Match -- Yes --> VLM[Route to VLM]
-    Match -- No --> Local[Run Local Code]
-    Local --> Crop[Extract/Crop/Diff/Overlay]
-    Crop --> Register[Register local:// URI]
-    Register --> VLMSub[Send Focused Crop]
-    VLMSub --> Verify[Verify Coordinates]
-    Verify --> Yield[Yield Result]
+---
+
+## Routing rubric
+
+Ask these questions in order:
+
+1. **Can code answer it?**
+   - Frame count, resolution, file type, crop bounds, duplicate frames, histograms, pixel diffs, OCR text, and box overlap should run locally.
+   - If code can answer, do not call a VLM.
+
+2. **Does the task need semantic judgment?**
+   - Identity, style, expression, obstruction, scene meaning, or prompt adherence may need a VLM.
+   - Send the smallest useful crop or overlay.
+
+3. **Does the task need segmentation, depth, or pose?**
+   - Route to a configured vision adapter or remote GPU service.
+   - If none exists, report the missing capability. Do not emulate large vision models on CPU.
+
+---
+
+## VLM response schema
+
+Require this shape or a stricter equivalent:
+
+```json
+{
+  "answer": true,
+  "evidence": "Concrete visual cues tied to the crop or overlay.",
+  "confidence": 0.0,
+  "caveats": "Ambiguity, occlusion, compression, or resolution limits.",
+  "regions": [
+    { "x": 0, "y": 0, "w": 1, "h": 1, "label": "object", "frame_id": "optional" }
+  ],
+  "needs_deterministic_check": true
+}
 ```
 
-Action steps:
-1. For detail questions, crop the region before sending it to a VLM.
-2. For frame counts or scene boundaries, use `ffprobe`, FPS, and frame indices.
-3. For overlap questions, calculate box geometry in code. Use a VLM only to judge the cropped overlap.
+Use `needs_deterministic_check: true` when any coordinate, boundary, count, or overlap claim still needs code verification.
 
 ---
 
-## 3. Failure control
+## Agent checklist
 
-- Registry probe: query the model registry. If no model reports `input=['text', 'image']`, or the vision API returns auth or connection errors, return a configuration error. Do not fall back to text-only completion.
-- VLM boxes: treat coordinates as proposals. Confirm them with crop-and-re-ask, overlay review, or intersection math.
+Before answering a visual question:
 
----
-
-## 4. Loop discipline
-
-1. Use one transform or inspection per step: extract frames, check stats; crop, inspect; diff, verify.
-2. Register each generated image with `register_artifact(path, label, purpose)` or the local equivalent. Include metadata in the next observation.
-3. Require a structured schema, such as `VisualGroundingResult`, for VLM calls.
-
----
-
-## 5. Decision rubric
-
-- Can FFmpeg or Pillow answer it?
-  - Frame count, dimensions, file type, histograms, duplicate hashes, pixel diffs.
-  - If yes, run locally and skip the VLM.
-- Does it need semantic judgment?
-  - Examples: obscured face, medieval styling, logo placement.
-  - If yes, send the exact crop, prompt, and schema to a remote VLM.
-- Does it need segmentation or depth?
-  - Examples: SAM masks, Depth-Anything depth maps.
-  - If yes, route to a remote GPU adapter. If none is configured, report the constraint; do not emulate large weights on CPU.
+- Name the local evidence you produced.
+- Name each artifact you sent to the VLM.
+- State whether the VLM had image input.
+- Separate observed pixels from model judgment.
+- Mark unverified VLM boxes as hypotheses.
+- Stop if the provider, model, or image input path fails.
