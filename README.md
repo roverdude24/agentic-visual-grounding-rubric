@@ -1,5 +1,9 @@
 # Code-Grounded Vision (CGV)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](pyproject.toml)
+[![Agents Compatibility](https://img.shields.io/badge/compatibility-Cursor%20%7C%20Claude%20Code%20%7C%20Windsurf%20%7C%20Copilot-orange.svg)](#1-minute-setup)
+
 CGV is an agent rubric for visual work. It makes the agent inspect pixels with code before it asks a vision model for judgment.
 
 Use CGV when an agent must reason about images, video frames, screenshots, overlays, layout, continuity, or generated media.
