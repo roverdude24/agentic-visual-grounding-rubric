@@ -1,72 +1,69 @@
-# Declarative Visual Grounding Rubric for Agents
+# Visual Grounding Rubric for Agents
 
-This skill governs how an agent makes decisions and executes tasks involving visual or spatial assets (video frames, screenshots, layouts, overlays). It enforces code-grounded inspection before semantic VLM queries.
+Use this skill for visual or spatial assets: video frames, screenshots, layouts, and overlays. Inspect with code before asking a VLM for judgment.
 
 ---
 
-## 1. Trigger Conditions
-Load this rubric only if the active task contains a visual component:
-- Video QC, keyframe checks, scene boundaries, continuity audits.
+## 1. Trigger conditions
+
+Load this rubric for:
+- Video QC, keyframes, scene boundaries, continuity audits.
 - UI layout inspection, screenshot debugging, alignment.
-- Contrast checks, logo/watermark overlay checks.
-- Creative generation QC (checking if an AI video matches prompt constraints).
+- Contrast checks and logo or watermark placement.
+- Generated image or video QC against prompt constraints.
 
-If the task is purely textual (code refactoring, general research, docs, package config), **do not trigger this rubric**. Keep the context lean.
+Skip it for text-only code, research, docs, or package config.
 
 ---
 
-## 2. Core Protocol: Deterministic-First
+## 2. Deterministic-first protocol
 
-Every visual task must be decomposed into two distinct layers:
-1. **Deterministic Layer (Local CPU Code)**: Runs in the persistent sandbox (Jupyter, IPython, OS shell). Always try to compute or isolate first.
-2. **Semantic Layer (Remote VLM Subagent)**: Runs via remote image-capable API. Only for high-level judgment.
+Split the work:
+1. Deterministic layer: local CPU code in Jupyter, IPython, or shell. Compute, crop, diff, or measure first.
+2. Semantic layer: remote image-capable VLM. Use it only for judgment code cannot supply.
 
 ```mermaid
 graph TD
-    Task[Visual Task] --> Match{Is it Pure Semantic?}
-    Match -- Yes --> VLM[Route to VLM Subagent]
-    Match -- No --> Local[Run Local Python Code]
+    Task[Visual Task] --> Match{Pure Semantic?}
+    Match -- Yes --> VLM[Route to VLM]
+    Match -- No --> Local[Run Local Code]
     Local --> Crop[Extract/Crop/Diff/Overlay]
     Crop --> Register[Register local:// URI]
-    Register --> VLMSub[Pass Focused Crop to VLM]
-    VLMSub --> Verify[Verify VLM coordinates geometrically]
+    Register --> VLMSub[Send Focused Crop]
+    VLMSub --> Verify[Verify Coordinates]
     Verify --> Yield[Yield Result]
 ```
 
-### Action Steps:
-1. **Never send high-res original frames directly to VLM** if the question is about a specific detail. Write Python code to `crop` the region of interest first.
-2. **Never ask VLM to count frames or detect boundaries.** Write shell scripts using `ffprobe` to get metadata, FPS, frame indices.
-3. **Never ask VLM to detect overlapping coordinates.** Write code to calculate bounding box overlap geometry. Use VLM only to inspect the overlapping region for semantic impact (e.g. "does this overlap hide text?").
+Action steps:
+1. For detail questions, crop the region before sending it to a VLM.
+2. For frame counts or scene boundaries, use `ffprobe`, FPS, and frame indices.
+3. For overlap questions, calculate box geometry in code. Use a VLM only to judge the cropped overlap.
 
 ---
 
-## 3. Failure Control (Fail-Closed)
+## 3. Failure control
 
-To prevent visual hallucinations, the agent must enforce strict fallback controls:
-- **Registry Probe:** Query the model registry. If no model reports `input=['text', 'image']`, or if the vision API returns auth/connection errors:
-  - **Do NOT fallback to text-only completions.**
-  - **Fail closed** by returning an explicit configuration error to the user stating VLM capability is missing.
-- **Hypothesis vs Truth:** If a VLM returns bounding box coordinates, they are **hypotheses**. The agent must write Python code to crop those coordinates and visually inspect them (or calculate intersection math) to confirm they match.
+- Registry probe: query the model registry. If no model reports `input=['text', 'image']`, or the vision API returns auth or connection errors, return a configuration error. Do not fall back to text-only completion.
+- VLM boxes: treat coordinates as proposals. Confirm them with crop-and-re-ask, overlay review, or intersection math.
 
 ---
 
-## 4. Loop Discipline for Visual Tasks
+## 4. Loop discipline
 
-When working on a visual task:
-1. **One transform/inspection per cell/step:** Avoid monolithic script execution. Run frame extraction, then check stats; crop, then inspect; diff, then verify.
-2. **Artifact Registry:** Register every image produced during execution using `register_artifact(path, label, purpose)` or equivalent. Ensure the next observation contains the metadata for that artifact.
-3. **Structured Grounding:** Always enforce a structured output schema (like `VisualGroundingResult`) for VLM calls to lock down responses.
+1. Use one transform or inspection per step: extract frames, check stats; crop, inspect; diff, verify.
+2. Register each generated image with `register_artifact(path, label, purpose)` or the local equivalent. Include metadata in the next observation.
+3. Require a structured schema, such as `VisualGroundingResult`, for VLM calls.
 
 ---
 
-## 5. Decision Rubric
+## 5. Decision rubric
 
-- **Step A: Can FFmpeg/Pillow resolve it?**
-  - Frame count, image dimensions, file type, color histograms, exact duplicate detection (hashing), visual diff (pixel subtraction).
-  - *If Yes: Execute locally, do not call VLM.*
-- **Step B: Does it require semantic understanding?**
-  - "Is character face obscured by hair?", "Does the styling read as medieval?", "Is the logo placement aesthetically pleasing?".
-  - *If Yes: Call remote VLM with the exact cropped image + prompt + schema.*
-- **Step C: Does it require heavy segmentation/depth?**
-  - Pixel-perfect masking (SAM), 3D depth-map reconstruction (Depth-Anything).
-  - *If Yes: Route to remote GPU perception adapter. If not configured, report constraint gracefully; do not attempt CPU emulation of large weights.*
+- Can FFmpeg or Pillow answer it?
+  - Frame count, dimensions, file type, histograms, duplicate hashes, pixel diffs.
+  - If yes, run locally and skip the VLM.
+- Does it need semantic judgment?
+  - Examples: obscured face, medieval styling, logo placement.
+  - If yes, send the exact crop, prompt, and schema to a remote VLM.
+- Does it need segmentation or depth?
+  - Examples: SAM masks, Depth-Anything depth maps.
+  - If yes, route to a remote GPU adapter. If none is configured, report the constraint; do not emulate large weights on CPU.
