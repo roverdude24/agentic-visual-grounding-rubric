@@ -1,5 +1,7 @@
 import pytest
-from cgv.routing import check_model_capabilities, verify_bounding_box_overlap
+import json
+import os
+from cgv.routing import check_model_capabilities, verify_bounding_box_overlap, prepare_prompt_for_vlm
 
 def test_check_model_capabilities():
     registry = [
@@ -26,3 +28,20 @@ def test_verify_bounding_box_overlap():
     # Invalid size
     with pytest.raises(ValueError):
         verify_bounding_box_overlap((0,0,-1,10), (0,0,10,10))
+
+def test_prepare_prompt_for_vlm(tmp_path, monkeypatch):
+    local_dir = tmp_path / "local"
+    local_dir.mkdir()
+    dummy_img = local_dir / "frame_0.jpg"
+    dummy_img.write_text("fake image data")
+    
+    monkeypatch.setenv("PI_EVAL_LOCAL_ROOTS", json.dumps({"local": str(local_dir)}))
+    
+    prompt = "Check image: local://frame_0.jpg"
+    temp_workspace_dir = tmp_path / "workspace_temp"
+    
+    safe_prompt = prepare_prompt_for_vlm(prompt, temp_dir=str(temp_workspace_dir))
+    
+    expected_copied_path = temp_workspace_dir / "frame_0.jpg"
+    assert os.path.exists(expected_copied_path)
+    assert safe_prompt == f"Check image: {expected_copied_path}"

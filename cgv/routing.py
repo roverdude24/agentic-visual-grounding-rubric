@@ -1,3 +1,7 @@
+import os
+import shutil
+import re
+import json
 from typing import List, Dict, Any, Tuple
 
 def check_model_capabilities(model_id: str, registry_models: List[Dict[str, Any]]) -> bool:
@@ -53,3 +57,47 @@ def verify_bounding_box_overlap(box_a: Tuple[float, float, float, float],
         return 0.0
         
     return inter_area / union_area
+
+def prepare_prompt_for_vlm(prompt_str: str, temp_dir: str = ".omp_vlm_temp") -> str:
+    """
+    Scans the prompt for local:// URIs, copies the referenced files to a temporary 
+    directory inside the active workspace, and replaces the URIs with relative workspace 
+    paths. This prevents the harness read() tool from dumping raw binary bytes of 
+    out-of-workspace files, which can cause model hangs.
+    """
+    uris = re.findall(r'local://[^\s"\'<>]+', prompt_str)
+    if not uris:
+        return prompt_str
+        
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    # Fetch local root config from harness environment
+    roots_env = os.environ.get('PI_EVAL_LOCAL_ROOTS')
+    if not roots_env:
+        return prompt_str
+        
+    try:
+        roots = json.loads(roots_env)
+    except json.JSONDecodeError:
+        return prompt_str
+        
+    local_root = roots.get('local')
+    if not local_root:
+        return prompt_str
+        
+    updated_prompt = prompt_str
+    for uri in uris:
+        filename = uri.replace('local://', '')
+        # Handle hash prefix if present
+        basename = filename.split('-', 1)[1] if '-' in filename and not filename.startswith('.') else filename
+        
+        src_path = os.path.join(local_root, filename)
+        if not os.path.exists(src_path):
+            src_path = os.path.join(local_root, basename)
+            
+        if os.path.exists(src_path):
+            dest_path = os.path.join(temp_dir, basename)
+            shutil.copy(src_path, dest_path)
+            updated_prompt = updated_prompt.replace(uri, dest_path)
+            
+    return updated_prompt
